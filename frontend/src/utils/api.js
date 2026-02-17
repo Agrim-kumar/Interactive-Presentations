@@ -5,6 +5,7 @@ const STATIC_BASE = process.env.REACT_APP_STATIC_URL || 'http://localhost:5000';
 
 const api = axios.create({
   baseURL: API_BASE,
+  timeout: 300000, // 5 minutes
 });
 
 // Presentation APIs

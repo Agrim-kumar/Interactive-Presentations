@@ -103,10 +103,17 @@ async function convertWithPoppler(pdfPath, presentationId) {
       await execPromise(cmd, { timeout: 120000 });
       return readSlideFiles(outputDir);
     } catch (e) {
+      if (e.message.includes('not recognized') || e.code === 127 || e.code === 'ENOENT') {
+        // Command not found, silently continue to next potential command/method
+      } else {
+        console.log(`   ⚠️ Poppler error: ${e.message.substring(0, 100)}`);
+      }
       lastError = e;
     }
   }
-  throw lastError;
+
+  // If we get here, all poppler commands failed
+  throw new Error('Poppler (pdftoppm) not found or failed. ' + (lastError ? lastError.message : ''));
 }
 
 async function convertWithGhostscript(pdfPath, presentationId) {
@@ -119,6 +126,19 @@ async function convertWithGhostscript(pdfPath, presentationId) {
   for (const cmd of gsCommands) {
     try { await execPromise(`${cmd} --version`); gsCmd = cmd; break; } catch (e) { /* next */ }
   }
+
+  if (!gsCmd) {
+    // Last ditch effort: try full paths on Windows
+    const fullPaths = [
+      'C:\\Program Files\\gs\\gs10.03.0\\bin\\gswin64c.exe',
+      'C:\\Program Files\\gs\\gs10.04.0\\bin\\gswin64c.exe',
+      'C:\\Program Files\\gs\\gs10.06.0\\bin\\gswin64c.exe', // Add more versions as needed
+    ];
+    for (const p of fullPaths) {
+      if (fs.existsSync(p)) { gsCmd = `"${p}"`; break; }
+    }
+  }
+
   if (!gsCmd) throw new Error('Ghostscript not found');
 
   const outputPattern = path.join(outputDir, 'slide-%03d.png');
